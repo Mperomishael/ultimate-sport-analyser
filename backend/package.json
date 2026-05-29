@@ -1,0 +1,47 @@
+{
+  "name": "football-predictions-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "@prisma/client": "^5.10.0",
+    "@auth/prisma-adapter": "^1.5.0",
+    "next-auth": "^5.0.0-beta.15",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "jose": "^5.2.2",
+    "zod": "^3.22.4",
+    "redis": "^4.6.13",
+    "ioredis": "^5.3.2",
+    "axios": "^1.6.7",
+    "axios-retry": "^4.0.0",
+    "rate-limiter-flexible": "^5.0.0",
+    "node-cron": "^3.0.3",
+    "winston": "^3.12.0",
+    "uuid": "^9.0.1",
+    "date-fns": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.11.24",
+    "@types/node-cron": "^3.0.11",
+    "@types/uuid": "^9.0.8",
+    "prisma": "^5.10.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

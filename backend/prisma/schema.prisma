@@ -1,0 +1,783 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USERS & AUTHENTICATION
+// ============================================
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatar        String?
+  role          UserRole  @default(USER)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  predictions   Prediction[]
+  betSlips      BetSlip[]
+  apiUsage      ApiUsage[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+// ============================================
+// LEAGUES & TEAMS
+// ============================================
+model League {
+  id            Int       @id
+  name          String
+  type          String    // league or cup
+  country       String
+  countryCode   String?
+  season        Int
+  seasonStart   DateTime?
+  seasonEnd     DateTime?
+  logo          String?
+  flag          String?
+  isActive      Boolean   @default(true)
+  isBlacklisted Boolean   @default(false)
+  priority      Int       @default(0)
+
+  fixtures      Fixture[]
+  standings     Standing[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("leagues")
+}
+
+model Team {
+  id            Int       @id
+  name          String
+  code          String?
+  country       String
+  founded       Int?
+  national      Boolean   @default(false)
+  logo          String?
+
+  homeFixtures  Fixture[] @relation("HomeTeam")
+  awayFixtures  Fixture[] @relation("AwayTeam")
+  standings     Standing[]
+  formRecords   TeamForm[]
+  injuries      Injury[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("teams")
+}
+
+// ============================================
+// FIXTURES & MATCHES
+// ============================================
+model Fixture {
+  id            Int       @id
+  referee       String?
+  timezone      String
+  date          DateTime
+  timestamp     Int
+  status        String    // NS, 1H, HT, 2H, ET, BT, P, SUSP, INT, FT, AET, PEN, PST, CANC, ABD, AWD, WO
+  elapsed       Int?
+  venueName     String?
+  venueCity     String?
+
+  leagueId      Int
+  league        League    @relation(fields: [leagueId], references: [id])
+
+  homeTeamId    Int
+  homeTeam      Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+
+  awayTeamId    Int
+  awayTeam      Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  homeGoals     Int?
+  awayGoals     Int?
+  homeHalftime  Int?
+  awayHalftime  Int?
+  homeFulltime  Int?
+  awayFulltime  Int?
+  homeExtratime Int?
+  awayExtratime Int?
+  homePenalty   Int?
+  awayPenalty   Int?
+
+  predictions   Prediction[]
+  odds          Odds[]
+  statistics    MatchStatistic[]
+  events        MatchEvent[]
+  lineups       Lineup[]
+  h2h           HeadToHead[] @relation("FixtureH2H")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([date])
+  @@index([status])
+  @@index([leagueId])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+  @@map("fixtures")
+}
+
+// ============================================
+// STANDINGS
+// ============================================
+model Standing {
+  id            String    @id @default(cuid())
+  rank          Int
+  points        Int
+  goalsDiff     Int
+  group         String?
+  form          String?
+  status        String?
+  description   String?
+
+  played        Int       @default(0)
+  won           Int       @default(0)
+  draw          Int       @default(0)
+  lost          Int       @default(0)
+  goalsFor      Int       @default(0)
+  goalsAgainst  Int       @default(0)
+
+  homePlayed    Int       @default(0)
+  homeWon       Int       @default(0)
+  homeDraw      Int       @default(0)
+  homeLost      Int       @default(0)
+  homeGoalsFor  Int       @default(0)
+  homeGoalsAgainst Int    @default(0)
+
+  awayPlayed    Int       @default(0)
+  awayWon       Int       @default(0)
+  awayDraw      Int       @default(0)
+  awayLost      Int       @default(0)
+  awayGoalsFor  Int       @default(0)
+  awayGoalsAgainst Int    @default(0)
+
+  update        DateTime
+
+  leagueId      Int
+  league        League    @relation(fields: [leagueId], references: [id])
+  teamId        Int
+  team          Team      @relation(fields: [teamId], references: [id])
+
+  @@unique([leagueId, teamId, update])
+  @@map("standings")
+}
+
+// ============================================
+// TEAM FORM
+// ============================================
+model TeamForm {
+  id            String    @id @default(cuid())
+  teamId        Int
+  team          Team      @relation(fields: [teamId], references: [id])
+  fixtureId     Int
+  result        String    // W, D, L
+  goalsFor      Int
+  goalsAgainst  Int
+  venue         String    // home, away, neutral
+  opponentId    Int
+  opponentName  String
+  date          DateTime
+
+  @@index([teamId])
+  @@index([date])
+  @@map("team_forms")
+}
+
+// ============================================
+// HEAD TO HEAD
+// ============================================
+model HeadToHead {
+  id            String    @id @default(cuid())
+  fixtureId     Int
+  fixture       Fixture   @relation("FixtureH2H", fields: [fixtureId], references: [id])
+
+  homeTeamId    Int
+  awayTeamId    Int
+  homeGoals     Int
+  awayGoals     Int
+  date          DateTime
+  league        String?
+
+  @@map("head_to_heads")
+}
+
+// ============================================
+// INJURIES
+// ============================================
+model Injury {
+  id            String    @id @default(cuid())
+  teamId        Int
+  team          Team      @relation(fields: [teamId], references: [id])
+  playerId      Int?
+  playerName    String
+  playerPhoto   String?
+  type          String
+  reason        String?
+  startDate     DateTime?
+  expectedReturn DateTime?
+
+  @@index([teamId])
+  @@map("injuries")
+}
+
+// ============================================
+// MATCH STATISTICS
+// ============================================
+model MatchStatistic {
+  id            String    @id @default(cuid())
+  fixtureId     Int
+  fixture       Fixture   @relation(fields: [fixtureId], references: [id])
+  teamId        Int
+  type          String    // shots on goal, shots off goal, total shots, blocked shots, shots inside box, shots outside box, fouls, corner kicks, offsides, ball possession, yellow cards, red cards, goalkeeper saves, total passes, passes accurate, passes %
+  value         String?
+
+  @@unique([fixtureId, teamId, type])
+  @@map("match_statistics")
+}
+
+// ============================================
+// MATCH EVENTS
+// ============================================
+model MatchEvent {
+  id            String    @id @default(cuid())
+  fixtureId     Int
+  fixture       Fixture   @relation(fields: [fixtureId], references: [id])
+  timeElapsed   Int
+  timeExtra     Int?
+  teamId        Int
+  playerId      Int?
+  playerName    String?
+  assistId      Int?
+  assistName    String?
+  type          String    // Goal, Card, Subst, Var
+  detail        String    // Normal Goal, Own Goal, Penalty, Missed Penalty, Yellow Card, Red Card, Substitution, etc
+  comments      String?
+
+  @@map("match_events")
+}
+
+// ============================================
+// LINEUPS
+// ============================================
+model Lineup {
+  id            String    @id @default(cuid())
+  fixtureId     Int
+  fixture       Fixture   @relation(fields: [fixtureId], references: [id])
+  teamId        Int
+  formation     String?
+  coachId       Int?
+  coachName     String?
+  coachPhoto    String?
+
+  players       Json?     // Array of player objects
+
+  @@map("lineups")
+}
+
+// ============================================
+// ODDS
+// ============================================
+model Odds {
+  id            String    @id @default(cuid())
+  fixtureId     Int
+  fixture       Fixture   @relation(fields: [fixtureId], references: [id])
+
+  bookmakerId   Int
+  bookmakerName String
+
+  market        String    // 1X2, Over/Under, BTTS, Asian Handicap, etc
+  label         String?   // specific bet label
+  oddValue      Float
+  oddChange     Float?    // change from opening
+
+  updatedAt     DateTime  @updatedAt
+
+  @@index([fixtureId])
+  @@index([market])
+  @@map("odds")
+}
+
+// ============================================
+// PREDICTIONS
+// ============================================
+model Prediction {
+  id            String    @id @default(cuid())
+  fixtureId     Int
+  fixture       Fixture   @relation(fields: [fixtureId], references: [id])
+
+  generatedBy   String?   // user id or 'system'
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id])
+
+  // Confidence scores (0-100)
+  over15        Float
+  over25        Float
+  btts          Float     // Both Teams To Score
+  homeWin       Float
+  awayWin       Float
+  draw          Float
+  doubleChanceHomeDraw Float
+  doubleChanceHomeAway Float
+  doubleChanceDrawAway Float
+  drawNoBetHome Float
+  drawNoBetAway Float
+  handicapHome  Float?
+  handicapAway  Float?
+
+  // Analysis data
+  homeFormScore     Float
+  awayFormScore     Float
+  h2hScore          Float
+  homeAwayScore     Float
+  goalsTrendScore   Float
+  injuryScore       Float
+  oddsMovementScore Float
+
+  overallConfidence Float
+  recommendedBet    String?
+  valueRating       Float?    // 1-10 value rating
+
+  // ML features
+  mlProbability     Json?     // model probabilities
+  featureVector     Json?     // input features
+
+  status            PredictionStatus @default(PENDING)
+  result            String?   // W, L, P (push) - for tracking accuracy
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([fixtureId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("predictions")
+}
+
+enum PredictionStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  WON
+  LOST
+  PUSH
+}
+
+// ============================================
+// BET SLIPS
+// ============================================
+model BetSlip {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+
+  name          String?
+  description   String?
+
+  totalOdds     Float
+  stake         Float?
+  potentialReturn Float?
+
+  status        BetSlipStatus @default(DRAFT)
+
+  selections    BetSelection[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("bet_slips")
+}
+
+enum BetSlipStatus {
+  DRAFT
+  ACTIVE
+  WON
+  LOST
+  PARTIAL
+  CASHOUT
+}
+
+model BetSelection {
+  id            String    @id @default(cuid())
+  betSlipId     String
+  betSlip       BetSlip   @relation(fields: [betSlipId], references: [id], onDelete: Cascade)
+
+  fixtureId     Int
+  market        String
+  selection     String    // the specific pick
+  odds          Float
+  confidence    Float
+
+  status        BetSelectionStatus @default(PENDING)
+
+  @@map("bet_selections")
+}
+
+enum BetSelectionStatus {
+  PENDING
+  WON
+  LOST
+  PUSH
+  VOID
+}
+
+// ============================================
+// API USAGE TRACKING
+// ============================================
+model ApiUsage {
+  id            String    @id @default(cuid())
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id])
+
+  provider      String    // api-football, odds-api
+  endpoint      String
+  requestsUsed  Int       @default(1)
+  requestsRemaining Int?
+  cost          Float     @default(0)
+
+  createdAt     DateTime  @default(now())
+
+  @@index([provider])
+  @@index([createdAt])
+  @@map("api_usage")
+}
+
+// ============================================
+// CONFIGURATION
+// ============================================
+model Config {
+  id            String    @id @default(cuid())
+  key           String    @unique
+  value         Json
+  description   String?
+  updatedBy     String?
+  updatedAt     DateTime  @updatedAt
+
+  @@map("config")
+}
+
+// ============================================
+// BLACKLISTED LEAGUES
+// ============================================
+model BlacklistedLeague {
+  id            String    @id @default(cuid())
+  leagueId      Int       @unique
+  leagueName    String
+  reason        String?
+  blacklistedBy String?
+  createdAt     DateTime  @default(now())
+
+  @@map("blacklisted_leagues")
+}
+
+// ============================================
+// PREDICTION WEIGHTS
+// ============================================
+model PredictionWeight {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  recentForm    Float     @default(0.20)
+  h2h           Float     @default(0.15)
+  homeAwayForm  Float     @default(0.15)
+  goalsTrend    Float     @default(0.15)
+  injuries      Float     @default(0.10)
+  oddsMovement  Float     @default(0.10)
+  standings     Float     @default(0.10)
+  motivation    Float     @default(0.05)
+  isActive      Boolean   @default(true)
+
+  updatedBy     String?
+  updatedAt     DateTime  @updatedAt
+
+  @@map("prediction_weights")
+}
+
+// ============================================
+// PREDICTION HISTORY & REASONING
+// ============================================
+model PredictionHistory {
+  id                      String    @id @default(cuid())
+  fixtureId               Int
+  leagueId                Int
+  
+  market                  String    // Over1.5, Under4.5, DoubleChance, etc
+  selectedOutcome         String
+  odds                    Float
+  confidence              Float     // 0-100
+  
+  reasoning               String    @db.Text // Detailed explanation
+  reasoningFactors        Json      // Array of factor objects
+  
+  apiSourceSnapshot       Json      // Raw data from API used for prediction
+  
+  betSlipId               String?   // Link to bet slip if part of one
+  generatedAt             DateTime  @default(now())
+  
+  // Result tracking
+  finalResult             String?   // ACTUAL RESULT after match ends (e.g., "OVER", "UNDER", "HOME_WIN")
+  resultStatus            PredictionResultStatus @default(PENDING)  // WON, LOST, PUSH, VOID
+  resultFetchedAt         DateTime?
+  
+  // Performance tracking
+  wasAccurate             Boolean?  // true if prediction matched result
+  roi                     Float?    // (winAmount - stake) / stake
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@index([fixtureId])
+  @@index([leagueId])
+  @@index([market])
+  @@index([resultStatus])
+  @@index([generatedAt])
+  @@map("prediction_histories")
+}
+
+enum PredictionResultStatus {
+  PENDING       // Match not yet finished
+  WON           // Prediction was correct
+  LOST          // Prediction was wrong
+  PUSH          // No winner (push)
+  VOID          // Bet voided/cancelled
+}
+
+// ============================================
+// LEAGUE RELIABILITY SCORING
+// ============================================
+model LeagueReliability {
+  id                      String    @id @default(cuid())
+  leagueId                Int       @unique
+  leagueName              String
+  
+  // Statistical metrics
+  totalPredictions        Int       @default(0)
+  successfulPredictions   Int       @default(0)
+  winRate                 Float     @default(0.0)
+  
+  averageGoals            Float     @default(0.0)
+  goalsVariance           Float     @default(0.0)
+  
+  upsetFrequency          Float     @default(0.0)    // % of unexpected results
+  predictabilityScore     Float     @default(0.0)    // 0-100, higher = more predictable
+  
+  marketReliability       Json      // { "Over1.5": 0.75, "DoubleChance": 0.82 }
+  
+  // Volatility
+  volatilityIndex         Float     @default(0.0)    // Std deviation of outcomes
+  riskRating              String    @default("MEDIUM") // LOW, MEDIUM, HIGH
+  
+  // League characteristics
+  defensiveStrength       Float     @default(0.5)
+  offensiveStrength       Float     @default(0.5)
+  
+  isActive                Boolean   @default(true)
+  lastUpdated             DateTime  @default(now())
+  
+  @@map("league_reliabilities")
+}
+
+// ============================================
+// MARKET PERFORMANCE ANALYTICS
+// ============================================
+model MarketAnalytics {
+  id                      String    @id @default(cuid())
+  market                  String    @unique  // Over1.5, Under4.5, DoubleChance, etc
+  
+  totalPredictions        Int       @default(0)
+  wonPredictions          Int       @default(0)
+  lostPredictions         Int       @default(0)
+  pushPredictions         Int       @default(0)
+  
+  winRate                 Float     @default(0.0)    // % of won predictions
+  avgConfidence           Float     @default(0.0)
+  
+  // Confidence calibration
+  confidenceAccuracy      Json      // { "80-90%": 0.75, "70-80%": 0.65 } - actual win rate by confidence bracket
+  
+  // ROI tracking
+  totalStake              Float     @default(0.0)
+  totalReturns            Float     @default(0.0)
+  roi                     Float     @default(0.0)
+  
+  // Market specifics
+  volatilityIndex         Float     @default(0.0)
+  averageOdds             Float     @default(0.0)
+  
+  lastUpdated             DateTime  @default(now())
+  
+  @@map("market_analytics")
+}
+
+// ============================================
+// CONFIDENCE CALIBRATION TRACKING
+// ============================================
+model ConfidenceCalibration {
+  id                      String    @id @default(cuid())
+  
+  confidenceRange         String    @unique  // "70-75", "75-80", "80-85", "85-90", "90-95"
+  
+  totalPredictions        Int       @default(0)
+  actualWinRate           Float     @default(0.0)    // Real win rate at this confidence level
+  
+  expectedWinRate         Float     @default(0.0)    // Theoretical expectation
+  calibrationError        Float     @default(0.0)    // Difference between expected and actual
+  
+  isWellCalibrated        Boolean   @default(true)   // If error is small
+  
+  lastUpdated             DateTime  @default(now())
+  
+  @@map("confidence_calibrations")
+}
+
+// ============================================
+// PREDICTION ENGINE MODES
+// ============================================
+model PredictionEngine {
+  id                      String    @id @default(cuid())
+  name                    String    @unique  // SAFE, BALANCED, AGGRESSIVE
+  
+  // Configuration
+  minConfidenceThreshold  Float     @default(78.0)
+  maxMatchesPerSlip       Int       @default(5)
+  
+  allowedMarkets          String[]  // Array of allowed market types
+  
+  // Safety settings
+  allowVolatileLeagues    Boolean   @default(false)
+  minimumLeagueRating     Float     @default(70.0)
+  
+  // Correlation limits
+  maxCorrelationScore     Float     @default(0.6)    // 0-1, prevent > 0.6 correlation
+  
+  // Advanced settings
+  diversificationMode     Boolean   @default(true)
+  enableFixtureDiversification Boolean @default(true)
+  enableLeagueDiversification Boolean @default(true)
+  
+  // Performance tracking
+  totalSlipsGenerated     Int       @default(0)
+  averageWinRate          Float     @default(0.0)
+  averageROI              Float     @default(0.0)
+  
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@map("prediction_engines")
+}
+
+// ============================================
+// BET SLIP DIVERSITY TRACKING
+// ============================================
+model BetSlipDiversity {
+  id                      String    @id @default(cuid())
+  generatedBatchId        String    // Group ID for slip batches
+  
+  slipsInBatch            Int       // How many slips generated
+  
+  // Diversification metrics
+  fixtureOverlapScore     Float     // 0-1, how much fixture overlap
+  leagueDistribution      Json      // { "Premier League": 3, "La Liga": 2, ... }
+  marketDistribution      Json      // { "Over1.5": 40%, "DoubleChance": 35% }
+  correlationMatrix       Json      // Correlation between selections
+  
+  averageSlipOdds         Float
+  
+  createdAt               DateTime  @default(now())
+  
+  @@map("bet_slip_diversities")
+}
+
+// ============================================
+// CORRELATION DETECTION RECORDS
+// ============================================
+model CorrelationAlert {
+  id                      String    @id @default(cuid())
+  betSlipId               String?   // If associated with a slip
+  
+  correlatedSelections    Json      // Array of correlated pick pairs
+  correlationScore        Float     // 0-1, higher = more correlated
+  
+  riskLevel               String    // LOW, MEDIUM, HIGH
+  recommendation          String    @db.Text
+  
+  wasSuppressed           Boolean   @default(false)  // User override?
+  
+  createdAt               DateTime  @default(now())
+  
+  @@map("correlation_alerts")
+}
+
+// ============================================
+// FIXTURE PERFORMANCE HISTORY
+// ============================================
+model FixturePerformance {
+  id                      String    @id @default(cuid())
+  fixtureId               Int       @unique
+  
+  homeTeamId              Int
+  awayTeamId              Int
+  leagueId                Int
+  
+  // Prediction accuracy
+  predictionAccuracy      Json      // { "Over1.5": 0.8, "DoubleChance": 0.75 }
+  
+  // Actual vs Expected
+  actualGoals             Int?
+  expectedGoals           Float?
+  
+  matchDifficulty         String    // EASY, MODERATE, HARD
+  upsetDetected           Boolean   @default(false)
+  
+  createdAt               DateTime  @default(now())
+  
+  @@index([fixtureId])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+  @@map("fixture_performances")
+}
+
+// ============================================
+// SCHEDULED SYNC JOBS
+// ============================================
+model SyncJob {
+  id                      String    @id @default(cuid())
+  jobType                 String    // FETCH_RESULTS, UPDATE_LEAGUE_STATS, CALIBRATE_CONFIDENCE, etc
+  
+  lastRunAt               DateTime?
+  nextScheduledRun        DateTime
+  
+  status                  String    @default("SCHEDULED")  // SCHEDULED, RUNNING, COMPLETED, FAILED
+  errorMessage            String?
+  
+  executionDurationMs     Int?
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@index([jobType])
+  @@index([nextScheduledRun])
+  @@map("sync_jobs")
+}

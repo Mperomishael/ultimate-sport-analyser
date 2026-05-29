@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: fp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: football_predictions
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: fp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fp-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - API_FOOTBALL_KEY=${API_FOOTBALL_KEY}
+      - THE_ODDS_API_KEY=${THE_ODDS_API_KEY}
+      - PREDICTION_SERVICE_URL=http://prediction-service:8001
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  # Backend API (Next.js API routes)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fp-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - API_FOOTBALL_KEY=${API_FOOTBALL_KEY}
+      - THE_ODDS_API_KEY=${THE_ODDS_API_KEY}
+      - PREDICTION_SERVICE_URL=http://prediction-service:8001
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # Prediction Service (Python FastAPI)
+  prediction-service:
+    build:
+      context: ./prediction-service
+      dockerfile: Dockerfile
+    container_name: fp-prediction
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - API_FOOTBALL_KEY=${API_FOOTBALL_KEY}
+      - THE_ODDS_API_KEY=${THE_ODDS_API_KEY}
+      - PREDICTION_SERVICE_API_KEY=${PREDICTION_SERVICE_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./prediction-service:/app
+      - prediction_models:/app/models
+
+volumes:
+  postgres_data:
+  redis_data:
+  prediction_models:
