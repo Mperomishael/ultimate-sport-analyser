@@ -19,7 +19,7 @@ football-predictions/
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, Recharts
 - **Backend**: Next.js API Routes, Prisma ORM, PostgreSQL, Redis, JWT Auth
 - **Prediction Engine**: Python, FastAPI, NumPy, Pandas, scikit-learn
-- **Data APIs**: API-Football, The Odds API
+- **Data APIs**: RapidAPI (Football), The Odds API
 - **Infrastructure**: Docker, Docker Compose, Redis caching
 
 ## Features
@@ -72,9 +72,11 @@ Before deployment, obtain the following API keys:
 
 | API | Purpose | Where to Get | Cost |
 |-----|---------|--------------|------|
-| API-Football | Fixture data, teams, leagues | https://www.api-football.com/ | Free tier available |
-| The Odds API | Live odds & betting lines | https://the-odds-api.com/ | Free tier available |
+| RapidAPI Key | Football data via RapidAPI (replaces api-football.com) | https://rapidapi.com/api-sports/api/api-football | Free tier: 100 req/day |
+| The Odds API | Live odds & betting lines | https://the-odds-api.com/ | Free tier: 500 req/month |
 | JWT Secret | API authentication | Generate: `openssl rand -base64 32` | Free |
+
+**Note:** This project uses RapidAPI for football data instead of direct api-football.com integration. See [RAPIDAPI_MIGRATION.md](./RAPIDAPI_MIGRATION.md) for complete setup instructions.
 
 ---
 
@@ -137,9 +139,11 @@ CACHE_TTL_SECONDS=300
 CACHE_PREDICTION_TTL=1800
 
 # ============================================
-# EXTERNAL APIs
+# EXTERNAL APIs (RapidAPI)
 # ============================================
-API_FOOTBALL_KEY="your_api_football_key_here"
+RAPIDAPI_KEY="your_rapidapi_key_from_dashboard"
+RAPIDAPI_HOST="api-football-v1.p.rapidapi.com"
+RAPIDAPI_FOOTBALL_ENDPOINT="https://api-football-v1.p.rapidapi.com"
 THE_ODDS_API_KEY="your_odds_api_key_here"
 
 # ============================================
@@ -171,11 +175,13 @@ ENABLE_JOB_LOGGING=true
 
 **How to Get Each API Key:**
 
-1. **API-Football Key**:
-   - Visit https://www.api-football.com/
-   - Sign up for free account
-   - Go to Dashboard → API Key
-   - Copy your key (free tier limited to 100 requests/day)
+1. **RapidAPI Key (Football Data)**:
+   - Visit https://rapidapi.com/api-sports/api/api-football
+   - Click "Sign Up" or "Log In"
+   - Click "Subscribe to Test" (free plan)
+   - Go to Dashboard → My Apps → Copy X-RapidAPI-Key
+   - Set as `RAPIDAPI_KEY` (free tier: 100 requests/day)
+   - See [RAPIDAPI_MIGRATION.md](./RAPIDAPI_MIGRATION.md) for detailed setup
 
 2. **The Odds API Key**:
    - Visit https://the-odds-api.com/
@@ -262,17 +268,19 @@ pip install -r requirements.txt
 
 #### Step 3.2: Update Prediction Service Config
 
-Edit `prediction-service/app/config.py`:
+Edit `prediction-service/app/core/config.py`:
 
 ```python
-class Config:
-    API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY")
-    THE_ODDS_API_KEY = os.getenv("THE_ODDS_API_KEY")
-    REDIS_URL = os.getenv("REDIS_URL")
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    DEBUG = os.getenv("NODE_ENV") == "development"
-    MAX_WORKERS = 4
-    CACHE_TTL = int(os.getenv("CACHE_PREDICTION_TTL", 1800))
+class Settings(BaseSettings):
+    # RapidAPI Configuration
+    RAPIDAPI_KEY: str = ""
+    RAPIDAPI_HOST: str = "api-football-v1.p.rapidapi.com"
+    RAPIDAPI_FOOTBALL_ENDPOINT: str = "https://api-football-v1.p.rapidapi.com"
+    THE_ODDS_API_KEY: str = ""
+    
+    REDIS_URL: str = "redis://localhost:6379/0"
+    DATABASE_URL: str = "postgresql://..."
+    DEBUG: bool = False
 ```
 
 #### Step 3.3: Start Prediction Service
@@ -416,7 +424,9 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
-      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY}
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY}
+      RAPIDAPI_HOST: api-football-v1.p.rapidapi.com
+      RAPIDAPI_FOOTBALL_ENDPOINT: https://api-football-v1.p.rapidapi.com
       THE_ODDS_API_KEY: ${THE_ODDS_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
@@ -433,7 +443,9 @@ services:
       context: ./prediction-service
       dockerfile: Dockerfile
     environment:
-      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY}
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY}
+      RAPIDAPI_HOST: api-football-v1.p.rapidapi.com
+      RAPIDAPI_FOOTBALL_ENDPOINT: https://api-football-v1.p.rapidapi.com
       THE_ODDS_API_KEY: ${THE_ODDS_API_KEY}
       REDIS_URL: ${REDIS_URL}
       DATABASE_URL: ${DATABASE_URL}
@@ -476,7 +488,9 @@ cp .env.example .env.docker
 DB_PASSWORD=your_secure_db_password
 DATABASE_URL=postgresql://analyzer:your_secure_db_password@postgres:5432/analyzer_db
 REDIS_URL=redis://redis:6379/0
-API_FOOTBALL_KEY=your_api_football_key
+RAPIDAPI_KEY=your_rapidapi_key_here
+RAPIDAPI_HOST=api-football-v1.p.rapidapi.com
+RAPIDAPI_FOOTBALL_ENDPOINT=https://api-football-v1.p.rapidapi.com
 THE_ODDS_API_KEY=your_odds_api_key
 JWT_SECRET=your_jwt_secret
 NEXT_PUBLIC_API_BASE=https://api.yourdomain.com
@@ -600,13 +614,15 @@ curl -X GET http://localhost:3001/api/health
 ### Missing API Data
 
 ```bash
-# Verify API keys are correct
-echo $API_FOOTBALL_KEY
+# Verify RapidAPI keys are correct
+echo $RAPIDAPI_KEY
+echo $RAPIDAPI_HOST
 echo $THE_ODDS_API_KEY
 
-# Test API endpoints directly
-curl "https://v3.football.api-sports.io/fixtures?date=2026-05-29" \
-  -H "x-apisports-key: YOUR_KEY"
+# Test RapidAPI Football endpoint directly
+curl "https://api-football-v1.p.rapidapi.com/fixtures?date=2026-05-29" \
+  -H "x-rapidapi-key: YOUR_RAPIDAPI_KEY" \
+  -H "x-rapidapi-host: api-football-v1.p.rapidapi.com"
 ```
 
 ### Jobs Not Running
@@ -635,8 +651,12 @@ DATABASE_URL="postgresql://analyzer:PASSWORD@localhost:5432/analyzer_db"
 # Cache
 REDIS_URL="redis://localhost:6379/0"
 
+# RapidAPI (Football Data)
+RAPIDAPI_KEY="YOUR_RAPIDAPI_KEY_HERE"
+RAPIDAPI_HOST="api-football-v1.p.rapidapi.com"
+RAPIDAPI_FOOTBALL_ENDPOINT="https://api-football-v1.p.rapidapi.com"
+
 # External APIs
-API_FOOTBALL_KEY="YOUR_KEY_HERE"
 THE_ODDS_API_KEY="YOUR_KEY_HERE"
 
 # Auth

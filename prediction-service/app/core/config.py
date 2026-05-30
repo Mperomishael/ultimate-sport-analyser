@@ -21,9 +21,10 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # API Keys
-    API_FOOTBALL_KEY: str = ""
-    API_FOOTBALL_HOST: str = "v3.football.api-sports.io"
+    # API Keys (RapidAPI)
+    RAPIDAPI_KEY: str = ""
+    RAPIDAPI_HOST: str = "api-football-v1.p.rapidapi.com"
+    RAPIDAPI_FOOTBALL_ENDPOINT: str = "https://api-football-v1.p.rapidapi.com"
     THE_ODDS_API_KEY: str = ""
 
     # Model paths

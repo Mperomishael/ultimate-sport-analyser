@@ -3,14 +3,15 @@
 import axios from "axios";
 import axiosRetry from "axios-retry";
 
-const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY;
-const API_FOOTBALL_HOST = process.env.API_FOOTBALL_HOST || "v3.football.api-sports.io";
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || "api-football-v1.p.rapidapi.com";
+const RAPIDAPI_FOOTBALL_ENDPOINT = process.env.RAPIDAPI_FOOTBALL_ENDPOINT || "https://api-football-v1.p.rapidapi.com";
 
 const apiFootballClient = axios.create({
-  baseURL: `https://${API_FOOTBALL_HOST}`,
+  baseURL: RAPIDAPI_FOOTBALL_ENDPOINT,
   headers: {
-    "x-rapidapi-key": API_FOOTBALL_KEY,
-    "x-rapidapi-host": API_FOOTBALL_HOST,
+    "x-rapidapi-key": RAPIDAPI_KEY,
+    "x-rapidapi-host": RAPIDAPI_HOST,
   },
   timeout: 10000,
 });

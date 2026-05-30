@@ -1,5 +1,5 @@
 """
-API-Football integration service for Python prediction engine
+RapidAPI Football (API-Football) integration service for Python prediction engine
 """
 
 import httpx
@@ -12,10 +12,10 @@ from app.core.config import settings
 
 class ApiFootballService:
     def __init__(self):
-        self.base_url = f"https://{settings.API_FOOTBALL_HOST}"
+        self.base_url = settings.RAPIDAPI_FOOTBALL_ENDPOINT
         self.headers = {
-            "x-rapidapi-key": settings.API_FOOTBALL_KEY,
-            "x-rapidapi-host": settings.API_FOOTBALL_HOST,
+            "x-rapidapi-key": settings.RAPIDAPI_KEY,
+            "x-rapidapi-host": settings.RAPIDAPI_HOST,
         }
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
